@@ -30,7 +30,7 @@ const COLORS = {
 const JournalScreen = () => {
   const navigation = useNavigation();
   const { selectedBook, loading: bookLoading } = useBook();
-  const { loading: journalLoading, journalEntries } = useJournal();
+  const { loading: journalLoading, journalEntries, getAllJournalEntries } = useJournal();
   const [currentInsight, setCurrentInsight] = useState(null);
   const [entrySubmitted, setEntrySubmitted] = useState(false);
   
@@ -43,6 +43,7 @@ const JournalScreen = () => {
   const streakAnimation = useState(new Animated.Value(0))[0];
   const [showScoreAnimation, setShowScoreAnimation] = useState(false);
   const [showStreakAnimation, setShowStreakAnimation] = useState(false);
+  const [scoreAnimationText, setScoreAnimationText] = useState('');
   
   // Get today's date in ISO format (YYYY-MM-DD)
   const today = new Date().toISOString().split('T')[0];
@@ -87,6 +88,14 @@ const JournalScreen = () => {
     
     // Only trigger animations for new entries
     if (isNewEntry) {
+      // Calculate points based on entry length (7-13 points per character)
+      const entryLength = entry.text.trim().length;
+      const pointsPerChar = Math.floor(Math.random() * 7) + 7; // Random number between 7-13
+      const pointsEarned = entryLength * pointsPerChar;
+      
+      // Save points earned for display in animation
+      const animationPoints = pointsEarned;
+      
       // Animate growth score increase
       setShowScoreAnimation(true);
       Animated.sequence([
@@ -103,8 +112,8 @@ const JournalScreen = () => {
         })
       ]).start(() => {
         setShowScoreAnimation(false);
-        // Update growth score after animation
-        setGrowthScore(prev => prev + 10);
+        // Update growth score after animation with calculated points
+        setGrowthScore(prev => prev + animationPoints);
       });
       
       // Animate streak increase
@@ -126,10 +135,25 @@ const JournalScreen = () => {
         // Update streak count after animation
         setStreakCount(prev => prev + 1);
       });
+      
+      // Update the animation text state with new points
+      setScoreAnimationText(`+${animationPoints} Growth`);
     }
     
     console.log('Journal entry saved:', entry);
   }, [journalEntries, today, scoreAnimation, streakAnimation]);
+
+  // Handle data reset
+  const handleDataReset = useCallback(() => {
+    // Reset local state
+    setGrowthScore(0);
+    setStreakCount(0);
+    setEntrySubmitted(false);
+    setCurrentInsight(null);
+    
+    // Force refresh of the journal entries
+    getAllJournalEntries();
+  }, [getAllJournalEntries]);
 
   // If still loading, show a loading message
   if (bookLoading || journalLoading) {
@@ -216,7 +240,7 @@ const JournalScreen = () => {
           ]}
         >
           <Feather name="trending-up" size={20} color={COLORS.whiteSmoke} />
-          <Text style={styles.animationText}>+10 Growth</Text>
+          <Text style={styles.animationText}>{scoreAnimationText}</Text>
         </Animated.View>
       )}
 

@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, StatusBar, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import BookGrid from '../components/BookGrid';
 import PromptScheduleSelector from '../components/PromptScheduleSelector';
 import BookDetailBottomSheet from '../components/BookDetailBottomSheet';
+import ResetDataButton from '../components/ResetDataButton';
 import { books } from '../data/bookData';
 import { useBook } from '../context/BookContext';
+import { useJournal } from '../context/JournalContext';
 
 // Color palette
 const COLORS = {
@@ -17,7 +19,7 @@ const COLORS = {
 };
 
 const BookSelectionScreen = () => {
-  // User stats - initial values
+  // User stats - will be updated from journal context
   const [growthScore, setGrowthScore] = useState(0);
   const [journalingStreak, setJournalingStreak] = useState(0);
   const [completionPercentage, setCompletionPercentage] = useState(0);
@@ -34,6 +36,51 @@ const BookSelectionScreen = () => {
   
   // Use the book context instead of local state for confirmed book
   const { selectedBook: confirmedBook, updateSelectedBook } = useBook();
+  
+  // Get journal data for stats
+  const { journalEntries, loading: journalLoading, getAllJournalEntries } = useJournal();
+
+  // Update stats from journal entries
+  useEffect(() => {
+    if (journalLoading || !journalEntries) return;
+    
+    // Calculate streak
+    let streak = 0;
+    const dates = Object.keys(journalEntries).sort().reverse(); // Get dates in descending order
+    
+    for (const date of dates) {
+      if (journalEntries[date]) {
+        streak++;
+      } else {
+        break; // Break once we find a gap
+      }
+    }
+    
+    setJournalingStreak(streak);
+    
+    // Get total entry count
+    const entryCount = Object.keys(journalEntries).length;
+    
+    // Calculate growth score (this should match JournalScreen calculation)
+    // We're using a simple calculation here since we can't access the detailed points
+    // from each entry, but in a real app this should be stored or calculated consistently
+    let totalScore = 0;
+    Object.values(journalEntries).forEach(entry => {
+      if (entry && entry.text) {
+        // Rough estimation of points - in practice would store actual points earned
+        const length = entry.text.length;
+        totalScore += length * 10; // Using average of 10 points per character
+      }
+    });
+    
+    setGrowthScore(totalScore);
+    
+    // Calculate completion percentage (example: if goal is 30 entries)
+    const goalEntries = 30;
+    const percentage = Math.min(100, Math.round((entryCount / goalEntries) * 100));
+    setCompletionPercentage(percentage);
+    
+  }, [journalEntries, journalLoading]);
 
   // Update book-related UI when book context changes
   useEffect(() => {
@@ -41,6 +88,19 @@ const BookSelectionScreen = () => {
       console.log('Current book from context:', confirmedBook.title);
     }
   }, [confirmedBook]);
+
+  // Handle data reset
+  const handleDataReset = useCallback(() => {
+    // Reset local state
+    setGrowthScore(0);
+    setJournalingStreak(0);
+    setCompletionPercentage(0);
+    
+    // Refresh data from storage
+    getAllJournalEntries();
+    
+    // The book will be cleared through the ResetDataUtil which clears AsyncStorage
+  }, [getAllJournalEntries]);
 
   const handleBookPress = (book) => {
     setSelectedBook(book);
@@ -72,6 +132,11 @@ const BookSelectionScreen = () => {
       <StatusBar barStyle="dark-content" />
       
       <ScrollView style={styles.scrollView}>
+        {/* Reset Data Button at the top */}
+        <View style={styles.resetButtonContainer}>
+          <ResetDataButton onReset={handleDataReset} />
+        </View>
+      
         {/* User Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -199,6 +264,11 @@ const styles = StyleSheet.create({
   selectedBookAuthor: {
     fontSize: 14,
     color: COLORS.navyInk,
+  },
+  resetButtonContainer: {
+    marginTop: 10,
+    marginBottom: 5,
+    alignItems: 'center'
   },
 });
 
