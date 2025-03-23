@@ -1,9 +1,11 @@
-import React from 'react';
-import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, View, Text, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import StreakCalendar from '../components/StreakCalendar';
 import BookInsightCard from '../components/BookInsightCard';
+import JournalEntryInput from '../components/JournalEntryInput';
 import { useBook } from '../context/BookContext';
+import { useJournal } from '../context/JournalContext';
 import { Feather } from 'react-native-vector-icons';
 
 // Color palette
@@ -18,15 +20,30 @@ const COLORS = {
 
 const JournalScreen = () => {
   const navigation = useNavigation();
-  const { selectedBook, loading } = useBook();
+  const { selectedBook, loading: bookLoading } = useBook();
+  const { loading: journalLoading } = useJournal();
+  const [currentInsight, setCurrentInsight] = useState(null);
+  const [entrySubmitted, setEntrySubmitted] = useState(false);
 
   // Navigate to setup tab to select a book
   const navigateToSetup = () => {
     navigation.navigate('Setup');
   };
 
+  // Callback to receive the current insight from BookInsightCard
+  const handleInsightChange = useCallback((insight) => {
+    setCurrentInsight(insight);
+  }, []);
+
+  // Handle successful journal entry save
+  const handleJournalSaved = useCallback((entry) => {
+    setEntrySubmitted(true);
+    console.log('Journal entry saved:', entry);
+    // You could implement a success message or animation here
+  }, []);
+
   // If still loading, show a loading message
-  if (loading) {
+  if (bookLoading || journalLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centeredContainer}>
@@ -66,13 +83,17 @@ const JournalScreen = () => {
         {/* Streak Calendar Component */}
         <StreakCalendar />
         
-        {/* Book Insight Card - now passing the full book object */}
-        <BookInsightCard book={selectedBook} />
+        {/* Book Insight Card - passing an onInsightChange callback */}
+        <BookInsightCard 
+          book={selectedBook}
+          onInsightChange={handleInsightChange}
+        />
         
-        <View style={styles.contentContainer}>
-          <Text style={styles.text}>Journal Entries</Text>
-          <Text style={styles.subtext}>This is where users will write their journal entries.</Text>
-        </View>
+        {/* Journal Entry Input Component */}
+        <JournalEntryInput 
+          currentInsight={currentInsight}
+          onSave={handleJournalSaved}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -95,24 +116,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 18,
     color: COLORS.navyInk,
-  },
-  contentContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    marginTop: 10,
-  },
-  text: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.navyInk,
-    marginBottom: 8,
-  },
-  subtext: {
-    fontSize: 16,
-    color: COLORS.navyInk,
-    textAlign: 'center',
   },
   noBookContainer: {
     flex: 1,

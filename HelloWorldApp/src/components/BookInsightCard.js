@@ -14,7 +14,7 @@ const COLORS = {
   inspiringBlue: '#3498DB'
 };
 
-const BookInsightCard = ({ book = null }) => {
+const BookInsightCard = ({ book = null, onInsightChange }) => {
   const [visible, setVisible] = useState(true);
   const [currentInsight, setCurrentInsight] = useState(0);
   const [insights, setInsights] = useState([]);
@@ -36,6 +36,13 @@ const BookInsightCard = ({ book = null }) => {
     // Reset to first insight when book changes
     setCurrentInsight(0);
   }, [book]);
+
+  // Update parent component when current insight changes
+  useEffect(() => {
+    if (insights.length > 0 && onInsightChange) {
+      onInsightChange(insights[currentInsight]);
+    }
+  }, [currentInsight, insights, onInsightChange]);
 
   // Get random insight (different from current)
   const getRandomInsight = () => {
