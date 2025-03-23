@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
-import { format, subDays } from 'date-fns';
+import { format, subDays, isToday, parseISO } from 'date-fns';
+import { useJournal } from '../context/JournalContext';
 
 // Color palette
 const COLORS = {
@@ -13,20 +14,6 @@ const COLORS = {
   completedGreen: '#4CAF50', // Green for completed days
   incompleteGray: '#E0E0E0',  // Light gray for incomplete days
   inspiringBlue: '#3498DB' // Inspiring blue for today's orb
-};
-
-// This is a placeholder. In a real app, this would come from a database or API
-const getDummyCompletionData = () => {
-  const today = new Date();
-  
-  // For demo purposes: simulate the user completed entries 2 days ago and today
-  return {
-    [format(today, 'yyyy-MM-dd')]: true,                 // Today (completed)
-    [format(subDays(today, 1), 'yyyy-MM-dd')]: false,    // Yesterday (not completed)
-    [format(subDays(today, 2), 'yyyy-MM-dd')]: true,     // 2 days ago (completed)
-    [format(subDays(today, 3), 'yyyy-MM-dd')]: false,    // 3 days ago (not completed)
-    [format(subDays(today, 4), 'yyyy-MM-dd')]: true,     // 4 days ago (completed)
-  };
 };
 
 // Get greeting based on time of day
@@ -43,33 +30,70 @@ const getGreeting = () => {
 };
 
 const StreakCalendar = () => {
+  const { journalEntries, loading } = useJournal();
   const today = new Date();
-  const completionData = getDummyCompletionData();
   const greeting = getGreeting();
   
-  // Generate the last 5 days (including today)
-  const dates = [];
-  for (let i = 4; i >= 0; i--) {
-    const date = subDays(today, i);
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const isCompleted = completionData[dateStr] || false;
+  // Get completion data based on journal entries
+  const completionData = useMemo(() => {
+    const data = {};
     
-    dates.push({
-      date,
-      isCompleted,
-      isToday: i === 0
-    });
-  }
+    // Past 5 days (including today)
+    for (let i = 0; i < 5; i++) {
+      const date = subDays(today, i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      data[dateStr] = !!journalEntries[dateStr]; // Convert to boolean
+    }
+    
+    return data;
+  }, [journalEntries, today]);
+  
+  // Generate the last 5 days (including today)
+  const dates = useMemo(() => {
+    const result = [];
+    for (let i = 4; i >= 0; i--) {
+      const date = subDays(today, i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const isCompleted = completionData[dateStr] || false;
+      
+      result.push({
+        date,
+        isCompleted,
+        isToday: i === 0
+      });
+    }
+    return result;
+  }, [completionData, today]);
   
   // Calculate current streak
-  let currentStreak = 0;
-  // Start from today and go backwards
-  for (let i = 0; i < dates.length; i++) {
-    if (dates[dates.length - 1 - i].isCompleted) {
-      currentStreak++;
-    } else {
-      break; // Break the streak when we find an incomplete day
+  const currentStreak = useMemo(() => {
+    let streak = 0;
+    // Start from today and go backwards
+    for (let i = 0; i < dates.length; i++) {
+      if (dates[dates.length - 1 - i].isCompleted) {
+        streak++;
+      } else {
+        break; // Break the streak when we find an incomplete day
+      }
     }
+    return streak;
+  }, [dates]);
+
+  // Render loading state if journal entries are still loading
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greetingText}>{greeting.icon} {greeting.text}</Text>
+          </View>
+          <View style={styles.streakBadge}>
+            <Text style={styles.streakCount}>...</Text>
+            <Text style={styles.streakText}>days</Text>
+          </View>
+        </View>
+      </View>
+    );
   }
   
   return (
@@ -189,7 +213,6 @@ const styles = StyleSheet.create({
   },
   todayContainer: {
     backgroundColor: COLORS.iceBlue,
-    // Removed border
   },
   completionOrb: {
     width: 30,
@@ -206,7 +229,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    // Removed border
   },
   dayText: {
     fontSize: 16,

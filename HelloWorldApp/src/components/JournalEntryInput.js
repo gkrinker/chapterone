@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -30,6 +30,7 @@ const JournalEntryInput = ({ currentInsight, onSave }) => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const { saveJournalEntry, getJournalEntry } = useJournal();
+  const inputRef = useRef(null);
   
   // Get today's date in ISO format (YYYY-MM-DD)
   const today = new Date().toISOString().split('T')[0];
@@ -40,6 +41,13 @@ const JournalEntryInput = ({ currentInsight, onSave }) => {
     if (todayEntry) {
       setEntryText(todayEntry.text || '');
     }
+    
+    // Auto-focus the text input when component mounts
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 500); // Short delay to ensure component is fully rendered
   }, [today]);
   
   const handleSave = async () => {
@@ -91,6 +99,7 @@ const JournalEntryInput = ({ currentInsight, onSave }) => {
         
         <View style={styles.inputContainer}>
           <TextInput
+            ref={inputRef}
             style={styles.input}
             multiline
             placeholder="Write your thoughts here..."
@@ -98,6 +107,7 @@ const JournalEntryInput = ({ currentInsight, onSave }) => {
             value={entryText}
             onChangeText={setEntryText}
             textAlignVertical="top"
+            autoFocus={Platform.OS === 'web'} // For web platform
           />
         </View>
         
