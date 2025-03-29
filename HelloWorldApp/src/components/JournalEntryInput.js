@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
-  KeyboardAvoidingView,
   Platform
 } from 'react-native';
 import { Feather } from 'react-native-vector-icons';
@@ -99,48 +98,43 @@ const JournalEntryInput = forwardRef(({ currentInsight, onSave }, ref) => {
   };
   
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={100}
-    >
-      <View style={styles.container}>
-        <Text style={styles.title}>Your Journal Entry</Text>
-        
-        <View style={styles.inputContainer}>
-          <TextInput
-            ref={inputRef}
-            style={styles.input}
-            multiline
-            placeholder="Write your thoughts here..."
-            placeholderTextColor={COLORS.coolGray}
-            value={entryText}
-            onChangeText={setEntryText}
-            textAlignVertical="top"
-            autoFocus={Platform.OS === 'web'} // For web platform
-          />
-        </View>
-        
-        <TouchableOpacity 
-          style={[styles.saveButton, saved && styles.savedButton]}
-          onPress={handleSave}
-          disabled={saving || saved}
-        >
-          {saving ? (
-            <ActivityIndicator color={COLORS.whiteSmoke} size="small" />
-          ) : saved ? (
-            <>
-              <Feather name="check-circle" size={16} color={COLORS.whiteSmoke} />
-              <Text style={styles.saveButtonText}>Saved!</Text>
-            </>
-          ) : (
-            <>
-              <Feather name="save" size={16} color={COLORS.whiteSmoke} />
-              <Text style={styles.saveButtonText}>Save Entry</Text>
-            </>
-          )}
-        </TouchableOpacity>
+    <View style={styles.container}>
+      <Text style={styles.title}>Your Journal Entry</Text>
+      
+      <View style={styles.inputContainer}>
+        <TextInput
+          ref={inputRef}
+          style={styles.input}
+          multiline
+          placeholder="Write your thoughts here..."
+          placeholderTextColor={COLORS.coolGray}
+          value={entryText}
+          onChangeText={setEntryText}
+          textAlignVertical="top"
+          autoFocus={Platform.OS === 'web'} // For web platform
+        />
       </View>
-    </KeyboardAvoidingView>
+      
+      <TouchableOpacity 
+        style={[styles.saveButton, saved && styles.savedButton]}
+        onPress={handleSave}
+        disabled={saving || saved}
+      >
+        {saving ? (
+          <ActivityIndicator color={COLORS.whiteSmoke} size="small" />
+        ) : saved ? (
+          <>
+            <Feather name="check-circle" size={16} color={COLORS.whiteSmoke} />
+            <Text style={styles.saveButtonText}>Saved!</Text>
+          </>
+        ) : (
+          <>
+            <Feather name="save" size={16} color={COLORS.whiteSmoke} />
+            <Text style={styles.saveButtonText}>Save Entry</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
   );
 });
 

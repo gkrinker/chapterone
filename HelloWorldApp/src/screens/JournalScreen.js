@@ -4,7 +4,6 @@ import {
   View, 
   Text, 
   SafeAreaView, 
-  ScrollView, 
   TouchableOpacity, 
   Animated
 } from 'react-native';
@@ -16,6 +15,7 @@ import { useBook } from '../context/BookContext';
 import { useJournal } from '../context/JournalContext';
 import { useStats } from '../context/StatsContext';
 import { Feather } from 'react-native-vector-icons';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 // Color palette
 const COLORS = {
@@ -151,8 +151,12 @@ const JournalScreen = () => {
   if (!selectedBook) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView style={styles.scrollView}>
-          {/* Streak Calendar still shows even when no book selected */}
+        <KeyboardAwareScrollView
+          style={styles.scrollView}
+          resetScrollToCoords={{ x: 0, y: 0 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps='handled'
+        >
           <StreakCalendar />
           
           <View style={styles.noBookContainer}>
@@ -165,7 +169,7 @@ const JournalScreen = () => {
               <Text style={styles.setupButtonText}>Go to Setup</Text>
             </TouchableOpacity>
           </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     );
   }
@@ -173,25 +177,26 @@ const JournalScreen = () => {
   // Normal journal screen with selected book
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.scrollView}>
-        {/* Streak Calendar Component */}
+      <KeyboardAwareScrollView
+        style={styles.scrollView}
+        resetScrollToCoords={{ x: 0, y: 0 }}
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps='handled'
+      >
         <StreakCalendar />
         
-        {/* Book Insight Card - passing an onInsightChange callback */}
         <BookInsightCard 
           book={selectedBook}
           onInsightChange={handleInsightChange}
         />
         
-        {/* Journal Entry Input Component */}
         <JournalEntryInput 
           ref={journalInputRef}
           currentInsight={currentInsight}
           onSave={handleJournalSaved}
         />
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
-      {/* Animations that appear when saving a journal entry */}
       {showScoreAnimation && (
         <Animated.View 
           style={[
