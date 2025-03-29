@@ -84,7 +84,9 @@ const BookInsightCard = ({ book = null, onInsightChange }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Inspired by {book.title}</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Inspired by {book.title}</Text>
+        </View>
         <View style={styles.actions}>
           <TouchableOpacity 
             style={styles.actionButton} 
@@ -135,8 +137,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
+  },
+  titleContainer: {
+    flexShrink: 1,
+    marginRight: 8,
   },
   title: {
     fontSize: 15,
