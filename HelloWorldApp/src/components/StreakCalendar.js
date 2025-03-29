@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import { format, subDays, isToday, parseISO } from 'date-fns';
 import { useJournal } from '../context/JournalContext';
+import { useStats } from '../context/StatsContext';
+import { Feather } from 'react-native-vector-icons';
 
 // Color palette
 const COLORS = {
@@ -30,7 +32,8 @@ const getGreeting = () => {
 };
 
 const StreakCalendar = () => {
-  const { journalEntries, loading } = useJournal();
+  const { journalEntries, loading: journalLoading } = useJournal();
+  const { growthScore, streak, loading: statsLoading } = useStats();
   const today = new Date();
   const greeting = getGreeting();
   
@@ -64,88 +67,68 @@ const StreakCalendar = () => {
     }
     return result;
   }, [completionData, today]);
-  
-  // Calculate current streak
-  const currentStreak = useMemo(() => {
-    let streak = 0;
-    // Start from today and go backwards
-    for (let i = 0; i < dates.length; i++) {
-      if (dates[dates.length - 1 - i].isCompleted) {
-        streak++;
-      } else {
-        break; // Break the streak when we find an incomplete day
-      }
-    }
-    return streak;
-  }, [dates]);
 
   // Render loading state if journal entries are still loading
-  if (loading) {
+  if (journalLoading || statsLoading) {
     return (
       <View style={styles.container}>
         <View style={styles.headerRow}>
           <View style={styles.greetingContainer}>
             <Text style={styles.greetingText}>{greeting.icon} {greeting.text}</Text>
           </View>
-          <View style={styles.streakBadge}>
-            <Text style={styles.streakCount}>...</Text>
-            <Text style={styles.streakText}>days</Text>
+          <View style={styles.statsContainer}>
+            <Text style={styles.statsLoading}>Loading...</Text>
           </View>
         </View>
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <View style={styles.greetingContainer}>
           <Text style={styles.greetingText}>{greeting.icon} {greeting.text}</Text>
         </View>
-        <View style={styles.streakBadge}>
-          <Text style={styles.streakCount}>{currentStreak}</Text>
-          <Text style={styles.streakText}>day{currentStreak !== 1 ? 's' : ''}</Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{growthScore}</Text>
+            <Text style={styles.statLabel}>Growth Score</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{streak}</Text>
+            <Text style={styles.statLabel}>Day Streak</Text>
+          </View>
         </View>
       </View>
       
       <View style={styles.calendarRow}>
-        {dates.map((item, index) => (
-          <View 
-            key={index} 
-            style={[
-              styles.dateContainer,
-              item.isToday && styles.todayContainer
-            ]}
-          >
+        {dates.map((dateInfo, index) => (
+          <View key={index} style={styles.dayContainer}>
             <View 
               style={[
-                styles.completionOrb,
-                item.isToday ? styles.todayOrb : null,
-                {
-                  backgroundColor: item.isToday 
-                    ? COLORS.inspiringBlue 
-                    : (item.isCompleted 
-                        ? COLORS.completedGreen 
-                        : COLORS.incompleteGray)
-                }
-              ]}
-            />
-            <Text 
-              style={[
-                styles.dayText,
-                item.isToday && styles.todayText
+                styles.dayCircle,
+                dateInfo.isCompleted ? styles.completedDay : styles.incompleteDay,
+                dateInfo.isToday && !dateInfo.isCompleted && styles.todayCircle
               ]}
             >
-              {format(item.date, 'd')}
-            </Text>
-            <Text 
-              style={[
-                styles.monthText,
-                item.isToday && styles.todayText
-              ]}
-            >
-              {format(item.date, 'MMM')}
-            </Text>
+              {dateInfo.isCompleted ? (
+                // Checkmark for completed days
+                <Feather name="check" size={18} color={COLORS.whiteSmoke} />
+              ) : (
+                // Day number for incomplete days
+                <Text 
+                  style={[
+                    styles.dayText,
+                    dateInfo.isToday && styles.todayText
+                  ]}
+                >
+                  {format(dateInfo.date, 'd')}
+                </Text>
+              )}
+            </View>
+            <Text style={styles.dayLabel}>{format(dateInfo.date, 'EEE')}</Text>
           </View>
         ))}
       </View>
@@ -157,10 +140,8 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.whiteSmoke,
     borderRadius: 12,
-    padding: 15,
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 20,
+    padding: 16,
+    margin: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -178,70 +159,73 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   greetingText: {
-    fontSize: 14,
-    color: COLORS.navyInk,
-    fontWeight: '500',
-  },
-  streakBadge: {
-    backgroundColor: COLORS.citrusZest,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  streakCount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.whiteSmoke,
-    marginRight: 4,
-  },
-  streakText: {
-    fontSize: 14,
-    color: COLORS.whiteSmoke,
-  },
-  calendarRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  dateContainer: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  todayContainer: {
-    backgroundColor: COLORS.iceBlue,
-  },
-  completionOrb: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginBottom: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  todayOrb: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  dayText: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.navyInk,
   },
-  monthText: {
-    fontSize: 14,
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
     color: COLORS.navyInk,
-    marginTop: 2,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: COLORS.navyInk,
+  },
+  statDivider: {
+    height: '80%',
+    width: 1,
+    backgroundColor: COLORS.coolGray,
+  },
+  statsLoading: {
+    fontSize: 14,
+    color: COLORS.coolGray,
+  },
+  calendarRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  dayContainer: {
+    alignItems: 'center',
+  },
+  dayCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  completedDay: {
+    backgroundColor: COLORS.completedGreen,
+  },
+  incompleteDay: {
+    backgroundColor: COLORS.incompleteGray,
+  },
+  todayCircle: {
+    backgroundColor: COLORS.inspiringBlue,
+    borderWidth: 2,
+    borderColor: COLORS.whiteSmoke,
+  },
+  dayText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.whiteSmoke,
   },
   todayText: {
-    fontWeight: 'bold',
+    color: COLORS.whiteSmoke,
+  },
+  dayLabel: {
+    fontSize: 12,
     color: COLORS.navyInk,
   },
 });

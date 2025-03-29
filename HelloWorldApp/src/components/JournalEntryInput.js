@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -25,12 +25,21 @@ const COLORS = {
   successGreen: '#2ECC71'
 };
 
-const JournalEntryInput = ({ currentInsight, onSave }) => {
+const JournalEntryInput = forwardRef(({ currentInsight, onSave }, ref) => {
   const [entryText, setEntryText] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const { saveJournalEntry, getJournalEntry } = useJournal();
   const inputRef = useRef(null);
+  
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  }));
   
   // Get today's date in ISO format (YYYY-MM-DD)
   const today = new Date().toISOString().split('T')[0];
@@ -48,7 +57,7 @@ const JournalEntryInput = ({ currentInsight, onSave }) => {
         inputRef.current.focus();
       }
     }, 500); // Short delay to ensure component is fully rendered
-  }, [today]);
+  }, [today, getJournalEntry]);
   
   const handleSave = async () => {
     if (!entryText.trim()) {
@@ -76,8 +85,8 @@ const JournalEntryInput = ({ currentInsight, onSave }) => {
         // Reset saved status after 3 seconds
         setTimeout(() => setSaved(false), 3000);
         
-        // Call the onSave callback if provided
-        if (onSave) onSave(entryData);
+        // Call the onSave callback if provided, passing the entry and today's date
+        if (onSave) onSave(entryData, today);
       } else {
         Alert.alert('Error', 'Failed to save your journal entry. Please try again.');
       }
@@ -133,7 +142,7 @@ const JournalEntryInput = ({ currentInsight, onSave }) => {
       </View>
     </KeyboardAvoidingView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

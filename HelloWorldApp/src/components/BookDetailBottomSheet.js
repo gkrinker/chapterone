@@ -21,14 +21,21 @@ const COLORS = {
   whiteSmoke: '#F8F9FA'
 };
 
-const BookDetailBottomSheet = ({ visible, book, onClose, onConfirm }) => {
+const BookDetailBottomSheet = ({ book, isVisible, onClose, onConfirm }) => {
   if (!book) return null;
+
+  const handleConfirmPress = (e) => {
+    // Prevent event from bubbling up to overlay
+    e.stopPropagation();
+    // Call the onConfirm callback
+    onConfirm(book);
+  };
 
   return (
     <Modal
       animationType="slide"
       transparent={true}
-      visible={visible}
+      visible={isVisible}
       onRequestClose={onClose}
     >
       <TouchableOpacity
@@ -76,7 +83,7 @@ const BookDetailBottomSheet = ({ visible, book, onClose, onConfirm }) => {
               
               <TouchableOpacity
                 style={styles.confirmButton}
-                onPress={() => onConfirm(book)}
+                onPress={handleConfirmPress}
               >
                 <Text style={styles.confirmButtonText}>Select This Book</Text>
               </TouchableOpacity>

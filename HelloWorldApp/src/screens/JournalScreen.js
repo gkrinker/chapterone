@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -6,15 +6,15 @@ import {
   SafeAreaView, 
   ScrollView, 
   TouchableOpacity, 
-  Alert,
   Animated
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import StreakCalendar from '../components/StreakCalendar';
 import BookInsightCard from '../components/BookInsightCard';
 import JournalEntryInput from '../components/JournalEntryInput';
 import { useBook } from '../context/BookContext';
 import { useJournal } from '../context/JournalContext';
+import { useStats } from '../context/StatsContext';
 import { Feather } from 'react-native-vector-icons';
 
 // Color palette
@@ -30,13 +30,13 @@ const COLORS = {
 const JournalScreen = () => {
   const navigation = useNavigation();
   const { selectedBook, loading: bookLoading } = useBook();
-  const { loading: journalLoading, journalEntries, getAllJournalEntries } = useJournal();
+  const { loading: journalLoading, journalEntries } = useJournal();
+  const { growthScore, streak, updateGrowthScore, loading: statsLoading } = useStats();
+  
   const [currentInsight, setCurrentInsight] = useState(null);
   const [entrySubmitted, setEntrySubmitted] = useState(false);
-  
-  // Stats with animation values
-  const [growthScore, setGrowthScore] = useState(0);
-  const [streakCount, setStreakCount] = useState(0);
+  const [isNewBookSelection, setIsNewBookSelection] = useState(false);
+  const journalInputRef = useRef(null);
   
   // Animation values
   const scoreAnimation = useState(new Animated.Value(0))[0];
@@ -47,27 +47,6 @@ const JournalScreen = () => {
   
   // Get today's date in ISO format (YYYY-MM-DD)
   const today = new Date().toISOString().split('T')[0];
-
-  // Update streak count based on journal entries
-  useEffect(() => {
-    if (journalLoading || !journalEntries) return;
-    
-    let count = 0;
-    const dates = Object.keys(journalEntries).sort().reverse(); // Get dates in descending order
-    
-    for (const date of dates) {
-      if (journalEntries[date]) {
-        count++;
-      } else {
-        break; // Break once we find a gap
-      }
-    }
-    
-    setStreakCount(count);
-    
-    // Growth score is based on number of entries
-    setGrowthScore(Object.keys(journalEntries).length * 10);
-  }, [journalEntries, journalLoading]);
 
   // Navigate to setup tab to select a book
   const navigateToSetup = () => {
@@ -80,21 +59,16 @@ const JournalScreen = () => {
   }, []);
 
   // Handle successful journal entry save
-  const handleJournalSaved = useCallback((entry) => {
+  const handleJournalSaved = useCallback((entry, entryDate) => {
     setEntrySubmitted(true);
     
     // Check if this is a new entry for today or an update
-    const isNewEntry = !journalEntries[today];
+    const isNewEntry = !journalEntries[entryDate];
     
     // Only trigger animations for new entries
     if (isNewEntry) {
-      // Calculate points based on entry length (7-13 points per character)
-      const entryLength = entry.text.trim().length;
-      const pointsPerChar = Math.floor(Math.random() * 7) + 7; // Random number between 7-13
-      const pointsEarned = entryLength * pointsPerChar;
-      
-      // Save points earned for display in animation
-      const animationPoints = pointsEarned;
+      // Use the StatsContext to update growth score with the entry
+      const pointsEarned = updateGrowthScore(10, entry);
       
       // Animate growth score increase
       setShowScoreAnimation(true);
@@ -112,8 +86,6 @@ const JournalScreen = () => {
         })
       ]).start(() => {
         setShowScoreAnimation(false);
-        // Update growth score after animation with calculated points
-        setGrowthScore(prev => prev + animationPoints);
       });
       
       // Animate streak increase
@@ -132,31 +104,40 @@ const JournalScreen = () => {
         })
       ]).start(() => {
         setShowStreakAnimation(false);
-        // Update streak count after animation
-        setStreakCount(prev => prev + 1);
       });
       
       // Update the animation text state with new points
-      setScoreAnimationText(`+${animationPoints} Growth`);
+      setScoreAnimationText(`+${pointsEarned} Growth`);
     }
     
-    console.log('Journal entry saved:', entry);
-  }, [journalEntries, today, scoreAnimation, streakAnimation]);
+    console.log('Journal entry saved:', entry, 'for date:', entryDate);
+  }, [journalEntries, scoreAnimation, streakAnimation, updateGrowthScore]);
 
-  // Handle data reset
-  const handleDataReset = useCallback(() => {
-    // Reset local state
-    setGrowthScore(0);
-    setStreakCount(0);
-    setEntrySubmitted(false);
-    setCurrentInsight(null);
-    
-    // Force refresh of the journal entries
-    getAllJournalEntries();
-  }, [getAllJournalEntries]);
+  // Focus the journal input when a book is first selected and the screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      // Check if this screen was navigated to right after a book selection
+      const params = navigation.getState().routes.find(r => r.name === 'Journal')?.params;
+      const shouldFocusInput = params?.focusInput || false;
+      
+      if (selectedBook && shouldFocusInput && journalInputRef.current) {
+        // Small delay to ensure the component is fully rendered
+        setTimeout(() => {
+          journalInputRef.current.focus();
+        }, 700);
+        
+        // Clear the navigation params
+        navigation.setParams({ focusInput: false });
+      }
+      
+      return () => {
+        // Cleanup function
+      };
+    }, [selectedBook, navigation])
+  );
 
   // If still loading, show a loading message
-  if (bookLoading || journalLoading) {
+  if (bookLoading || journalLoading || statsLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.centeredContainer}>
@@ -193,19 +174,6 @@ const JournalScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.scrollView}>
-        {/* Stats display */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{growthScore}</Text>
-            <Text style={styles.statLabel}>Growth Score</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{streakCount}</Text>
-            <Text style={styles.statLabel}>Day Streak</Text>
-          </View>
-        </View>
-
         {/* Streak Calendar Component */}
         <StreakCalendar />
         
@@ -217,6 +185,7 @@ const JournalScreen = () => {
         
         {/* Journal Entry Input Component */}
         <JournalEntryInput 
+          ref={journalInputRef}
           currentInsight={currentInsight}
           onSave={handleJournalSaved}
         />
@@ -275,36 +244,27 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    paddingTop: 10,
-  },
-  centeredContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 18,
-    color: COLORS.navyInk,
   },
   statsContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     backgroundColor: COLORS.whiteSmoke,
+    paddingVertical: 16,
+    marginTop: 16,
     marginHorizontal: 16,
-    marginVertical: 8,
-    padding: 16,
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
+    flex: 1,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: COLORS.navyInk,
   },
@@ -314,26 +274,37 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   statDivider: {
+    height: '60%',
     width: 1,
-    height: '80%',
     backgroundColor: COLORS.coolGray,
-    marginHorizontal: 8,
+    alignSelf: 'center',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: COLORS.navyInk,
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   noBookContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 25,
-    marginTop: 30,
-    marginHorizontal: 16,
-    backgroundColor: COLORS.iceBlue,
+    backgroundColor: COLORS.whiteSmoke,
     borderRadius: 12,
+    padding: 20,
+    margin: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   noBookIcon: {
     marginBottom: 20,
   },
   noBookTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: COLORS.navyInk,
     marginBottom: 12,
@@ -344,10 +315,10 @@ const styles = StyleSheet.create({
     color: COLORS.navyInk,
     textAlign: 'center',
     marginBottom: 20,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   setupButton: {
-    backgroundColor: COLORS.citrusZest,
+    backgroundColor: COLORS.inspiringBlue,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -361,23 +332,23 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     backgroundColor: COLORS.inspiringBlue,
-    borderRadius: 20,
     paddingVertical: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
     elevation: 5,
   },
   animationText: {
     color: COLORS.whiteSmoke,
-    fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 6,
-  }
+    marginLeft: 8,
+  },
 });
 
 export default JournalScreen; 

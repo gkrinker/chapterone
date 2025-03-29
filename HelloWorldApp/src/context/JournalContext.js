@@ -69,6 +69,23 @@ export const JournalProvider = ({ children }) => {
     }
   };
 
+  // Reset all journal entries (for data reset)
+  const resetJournalEntries = async () => {
+    try {
+      console.log("JournalContext: Removing journal entries from AsyncStorage...");
+      await AsyncStorage.removeItem('journalEntries');
+      
+      console.log("JournalContext: Clearing entries from state...");
+      setJournalEntries({});
+      
+      console.log("JournalContext: Journal entries reset complete");
+      return true;
+    } catch (error) {
+      console.error('Failed to reset journal entries:', error);
+      return false;
+    }
+  };
+
   // Provide context value to children
   return (
     <JournalContext.Provider 
@@ -78,6 +95,7 @@ export const JournalProvider = ({ children }) => {
         getJournalEntry,
         getAllJournalEntries,
         deleteJournalEntry,
+        resetJournalEntries,
         loading 
       }}
     >

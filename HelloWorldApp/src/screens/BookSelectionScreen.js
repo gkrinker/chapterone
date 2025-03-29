@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, View, Text, SafeAreaView, StatusBar, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, SafeAreaView, StatusBar, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import BookGrid from '../components/BookGrid';
 import PromptScheduleSelector from '../components/PromptScheduleSelector';
 import BookDetailBottomSheet from '../components/BookDetailBottomSheet';
-import ResetDataButton from '../components/ResetDataButton';
+import ResetButton from '../components/ResetButton';
 import { books } from '../data/bookData';
 import { useBook } from '../context/BookContext';
 import { useJournal } from '../context/JournalContext';
+import { useStats } from '../context/StatsContext';
 
 // Color palette
 const COLORS = {
@@ -19,9 +20,10 @@ const COLORS = {
 };
 
 const BookSelectionScreen = () => {
-  // User stats - will be updated from journal context
-  const [growthScore, setGrowthScore] = useState(0);
-  const [journalingStreak, setJournalingStreak] = useState(0);
+  // Use stats from StatsContext instead of local state
+  const { growthScore, streak, resetStats, loading: statsLoading } = useStats();
+  
+  // Completion percentage state (not stored in StatsContext)
   const [completionPercentage, setCompletionPercentage] = useState(0);
 
   const [selectedBook, setSelectedBook] = useState(null);
@@ -37,45 +39,15 @@ const BookSelectionScreen = () => {
   // Use the book context instead of local state for confirmed book
   const { selectedBook: confirmedBook, updateSelectedBook } = useBook();
   
-  // Get journal data for stats
+  // Get journal data for completion percentage calculation
   const { journalEntries, loading: journalLoading, getAllJournalEntries } = useJournal();
 
-  // Update stats from journal entries
+  // Calculate completion percentage based on journal entries
   useEffect(() => {
     if (journalLoading || !journalEntries) return;
     
-    // Calculate streak
-    let streak = 0;
-    const dates = Object.keys(journalEntries).sort().reverse(); // Get dates in descending order
-    
-    for (const date of dates) {
-      if (journalEntries[date]) {
-        streak++;
-      } else {
-        break; // Break once we find a gap
-      }
-    }
-    
-    setJournalingStreak(streak);
-    
-    // Get total entry count
-    const entryCount = Object.keys(journalEntries).length;
-    
-    // Calculate growth score (this should match JournalScreen calculation)
-    // We're using a simple calculation here since we can't access the detailed points
-    // from each entry, but in a real app this should be stored or calculated consistently
-    let totalScore = 0;
-    Object.values(journalEntries).forEach(entry => {
-      if (entry && entry.text) {
-        // Rough estimation of points - in practice would store actual points earned
-        const length = entry.text.length;
-        totalScore += length * 10; // Using average of 10 points per character
-      }
-    });
-    
-    setGrowthScore(totalScore);
-    
     // Calculate completion percentage (example: if goal is 30 entries)
+    const entryCount = Object.keys(journalEntries).length;
     const goalEntries = 30;
     const percentage = Math.min(100, Math.round((entryCount / goalEntries) * 100));
     setCompletionPercentage(percentage);
@@ -89,18 +61,25 @@ const BookSelectionScreen = () => {
     }
   }, [confirmedBook]);
 
-  // Handle data reset
+  // Handle data reset (now using StatsContext)
   const handleDataReset = useCallback(() => {
-    // Reset local state
-    setGrowthScore(0);
-    setJournalingStreak(0);
+    console.log("RESET_DEBUG: handleDataReset callback executed in BookSelectionScreen");
+    
+    // Reset the local state
     setCompletionPercentage(0);
+    console.log("RESET_DEBUG: completionPercentage reset to 0");
     
-    // Refresh data from storage
-    getAllJournalEntries();
+    // The selected book, stats, and journal entries will be reset by the ResetDataButton component
+    // We just need to update our UI to reflect those changes
     
-    // The book will be cleared through the ResetDataUtil which clears AsyncStorage
-  }, [getAllJournalEntries]);
+    // Force a re-render by setting the state
+    setSelectedBook(null);
+    console.log("RESET_DEBUG: selectedBook state in BookSelectionScreen set to null");
+    
+    // Show a confirmation message to the user
+    Alert.alert('Reset Complete', 'All data has been successfully reset.');
+    console.log("RESET_DEBUG: Reset complete alert shown in BookSelectionScreen");
+  }, []);
 
   const handleBookPress = (book) => {
     setSelectedBook(book);
@@ -112,20 +91,43 @@ const BookSelectionScreen = () => {
   };
 
   const handleConfirmBookSelection = (book) => {
+    // First, close the bottom sheet
+    setIsBottomSheetVisible(false);
+    
+    // Check if this is the first book selection or changing books
+    const isFirstBookSelection = !confirmedBook;
+    
     // Update the book in context
     updateSelectedBook(book);
-    setIsBottomSheetVisible(false);
     console.log('Book selected:', book.title);
     console.log('Schedule:', schedule);
     
-    // Navigate to Journal tab after book selection
-    navigation.navigate('Journal');
+    // Navigate based on whether this is the first book or changing books
+    if (isFirstBookSelection) {
+      // If no previous book had been selected, take user to journaling screen
+      // and pass parameter to focus the input
+      navigation.navigate('Journal', { focusInput: true });
+    } else {
+      // If changing books, stay on the setup screen with tray lowered
+      // No navigation needed as we're already on the setup screen
+    }
   };
 
   const handleScheduleChange = (newSchedule) => {
     setSchedule(newSchedule);
     console.log('Schedule updated:', newSchedule);
   };
+
+  // Show loading state if data is still loading
+  if (journalLoading || statsLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -134,7 +136,7 @@ const BookSelectionScreen = () => {
       <ScrollView style={styles.scrollView}>
         {/* Reset Data Button at the top */}
         <View style={styles.resetButtonContainer}>
-          <ResetDataButton onReset={handleDataReset} />
+          <ResetButton onReset={handleDataReset} />
         </View>
       
         {/* User Stats Row */}
@@ -147,7 +149,7 @@ const BookSelectionScreen = () => {
           <View style={styles.statDivider} />
           
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{journalingStreak}</Text>
+            <Text style={styles.statValue}>{streak}</Text>
             <Text style={styles.statLabel}>Day Streak</Text>
           </View>
           
@@ -161,29 +163,29 @@ const BookSelectionScreen = () => {
         
         <PromptScheduleSelector onScheduleChange={handleScheduleChange} />
         
-        {confirmedBook ? (
+        {confirmedBook && (
           <View style={styles.selectedBookContainer}>
-            <Text style={styles.selectedLabel}>Currently Selected Book:</Text>
+            <Text style={styles.selectedLabel}>Currently Reading</Text>
             <View style={styles.selectedBook}>
-              <Text style={styles.selectedBookTitle}>{confirmedBook.title}</Text>
-              <Text style={styles.selectedBookAuthor}>by {confirmedBook.author}</Text>
+              <View>
+                <Text style={styles.selectedBookTitle}>{confirmedBook.title}</Text>
+                <Text style={styles.selectedBookAuthor}>{confirmedBook.author}</Text>
+              </View>
             </View>
           </View>
-        ) : null}
+        )}
         
-        <View style={styles.booksContainer}>
-          <Text style={styles.sectionTitle}>Select book to inspire your journaling:</Text>
-          <BookGrid 
-            books={books} 
-            onSelectBook={handleBookPress}
-            selectedBookId={confirmedBook ? confirmedBook.id : null} 
-          />
-        </View>
+        <Text style={styles.sectionTitle}>Choose a Book</Text>
+        <BookGrid 
+          books={books} 
+          onSelectBook={handleBookPress} 
+          selectedBookId={confirmedBook?.id} 
+        />
       </ScrollView>
       
-      <BookDetailBottomSheet
-        visible={isBottomSheetVisible}
+      <BookDetailBottomSheet 
         book={selectedBook}
+        isVisible={isBottomSheetVisible}
         onClose={handleCloseBottomSheet}
         onConfirm={handleConfirmBookSelection}
       />
@@ -199,6 +201,16 @@ const styles = StyleSheet.create({
   scrollView: {
     backgroundColor: COLORS.whiteSmoke,
     marginTop: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 18,
+    color: COLORS.navyInk,
   },
   statsRow: {
     flexDirection: 'row',
