@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, SafeAreaView, StatusBar, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import * as Notifications from 'expo-notifications';
 import BookGrid from '../components/BookGrid';
 import PromptScheduleSelector from '../components/PromptScheduleSelector';
 import BookDetailBottomSheet from '../components/BookDetailBottomSheet';
@@ -28,11 +29,9 @@ const BookSelectionScreen = () => {
 
   const [selectedBook, setSelectedBook] = useState(null);
   const [isBottomSheetVisible, setIsBottomSheetVisible] = useState(false);
-  const [schedule, setSchedule] = useState({
-    promptType: 'pending',
-    reminderTime: null
-  });
-  
+  // Lift reminderTime state up from PromptScheduleSelector
+  const [reminderTime, setReminderTime] = useState(null);
+
   // Navigation
   const navigation = useNavigation();
   
@@ -61,23 +60,34 @@ const BookSelectionScreen = () => {
     }
   }, [confirmedBook]);
 
-  // Handle data reset (now using StatsContext)
-  const handleDataReset = useCallback(() => {
+  // Handle data reset
+  const handleDataReset = useCallback(async () => {
     console.log("RESET_DEBUG: handleDataReset callback executed in BookSelectionScreen");
-    
+
+    // Cancel all scheduled notifications
+    try {
+        await Notifications.cancelAllScheduledNotificationsAsync();
+        console.log("RESET_DEBUG: All scheduled notifications cancelled.");
+    } catch (error) {
+        console.error("RESET_DEBUG: Error cancelling notifications:", error);
+        Alert.alert("Error", "Could not cancel scheduled reminders.");
+    }
+
     // Reset the local state
     setCompletionPercentage(0);
     console.log("RESET_DEBUG: completionPercentage reset to 0");
-    
-    // The selected book, stats, and journal entries will be reset by the ResetDataButton component
-    // We just need to update our UI to reflect those changes
-    
-    // Force a re-render by setting the state
     setSelectedBook(null);
     console.log("RESET_DEBUG: selectedBook state in BookSelectionScreen set to null");
-    
+    // Reset the lifted reminder time state
+    setReminderTime(null);
+    console.log("RESET_DEBUG: reminderTime state reset to null");
+
+    // Note: The ResetDataButton component should handle resetting context data (stats, journal, book)
+    // If it doesn't, those resets need to be explicitly called here as well.
+    // Example: resetStats(); updateSelectedBook(null); etc.
+
     // Show a confirmation message to the user
-    Alert.alert('Reset Complete', 'All data has been successfully reset.');
+    Alert.alert('Reset Complete', 'All data and reminders have been successfully reset.');
     console.log("RESET_DEBUG: Reset complete alert shown in BookSelectionScreen");
   }, []);
 
@@ -100,7 +110,7 @@ const BookSelectionScreen = () => {
     // Update the book in context
     updateSelectedBook(book);
     console.log('Book selected:', book.title);
-    console.log('Schedule:', schedule);
+    console.log('Schedule:', reminderTime);
     
     // Navigate based on whether this is the first book or changing books
     if (isFirstBookSelection) {
@@ -113,9 +123,11 @@ const BookSelectionScreen = () => {
     }
   };
 
-  const handleScheduleChange = (newSchedule) => {
-    setSchedule(newSchedule);
-    console.log('Schedule updated:', newSchedule);
+  // New handler for when reminder time is submitted from PromptScheduleSelector
+  const handleReminderTimeChange = (newTime) => {
+    setReminderTime(newTime);
+    console.log('Reminder time updated in BookSelectionScreen:', newTime);
+    // No need to call schedule notification here, PromptScheduleSelector handles it
   };
 
   // Show loading state if data is still loading
@@ -161,7 +173,11 @@ const BookSelectionScreen = () => {
           </View>
         </View>
         
-        <PromptScheduleSelector onScheduleChange={handleScheduleChange} />
+        {/* Pass reminderTime and handler down */}
+        <PromptScheduleSelector
+          reminderTime={reminderTime}
+          onReminderTimeChange={handleReminderTimeChange}
+        />
         
         {confirmedBook && (
           <View style={styles.selectedBookContainer}>
