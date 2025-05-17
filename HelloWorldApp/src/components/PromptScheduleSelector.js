@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Platform, Alert, Modal, Pressable, Animated } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Platform, Alert, Modal, Pressable, Animated, Dimensions } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Notifications from 'expo-notifications';
 import ConfettiCannon from 'react-native-confetti-cannon';
@@ -14,6 +14,8 @@ const COLORS = {
   whiteSmoke: '#F8F9FA',
   inspiringBlue: '#2A9D8F'
 };
+
+const { width } = Dimensions.get('window');
 
 // Helper function to request permissions (can be moved to a utility file later)
 async function registerForPushNotificationsAsync() {
@@ -112,6 +114,7 @@ console.log("DEBUG: Notification handler set."); // Log handler setup
 const PromptScheduleSelector = ({ reminderTime, onReminderTimeChange }) => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [tempReminderTime, setTempReminderTime] = useState(new Date());
+  const [showConfetti, setShowConfetti] = useState(false);
   const confettiRef = useRef();
   const [showCongratsAnimation, setShowCongratsAnimation] = useState(false);
   const congratsAnimation = useRef(new Animated.Value(0)).current;
@@ -190,7 +193,7 @@ const PromptScheduleSelector = ({ reminderTime, onReminderTimeChange }) => {
 
     if (confettiRef.current) {
       console.log("DEBUG: Triggering confetti");
-      confettiRef.current.start();
+      setShowConfetti(true);
     }
 
     setShowCongratsAnimation(true);
@@ -274,15 +277,18 @@ const PromptScheduleSelector = ({ reminderTime, onReminderTimeChange }) => {
         </View>
       </Modal>
 
-      <ConfettiCannon
-        ref={confettiRef}
-        count={200}
-        origin={{ x: -10, y: 0 }}
-        autoStart={false}
-        fadeOut={true}
-        explosionSpeed={400}
-        style={styles.confetti}
-      />
+      {showConfetti && (
+        <ConfettiCannon
+          ref={confettiRef}
+          count={200}
+          origin={{ x: width / 2, y: 0 }}
+          autoStart={true}
+          fadeOut={true}
+          explosionSpeed={400}
+          style={styles.confetti}
+          onAnimationEnd={() => setShowConfetti(false)}
+        />
+      )}
 
       {showCongratsAnimation && (
         <Animated.View 

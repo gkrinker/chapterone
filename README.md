@@ -5,7 +5,11 @@ A mobile application for journaling inspired by books. ChapterOne helps users ma
 ## Features
 
 - Book selection for journaling inspiration
-- Customizable journaling schedule
+- Customizable journaling schedule with daily notifications:
+  - Tap "Select Time" to open a centered time picker modal.
+  - Confirm the time using the "Submit" button in the modal.
+  - After submission, a confirmation message displays the chosen time.
+  - A daily notification is scheduled at the selected time with the title "You have a new journaling prompt!" and body "Take a moment today to invest in your growth."
 - User growth tracking
 - Beautiful, intuitive interface
 
